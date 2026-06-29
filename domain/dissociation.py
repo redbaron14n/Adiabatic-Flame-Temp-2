@@ -62,9 +62,6 @@ class Dissociation:
 
         rfrms = {compounds[r].formula for r in self._radicals}
         mfrm = compounds[self._molecule].formula
-        # rad_raw, prod_raw = balance_stoichiometry({mfrm}, rfrms)
-        # rad = {species: float(coeff) for species, coeff in rad_raw.items()} # Sanitizing result from SymPy objects
-        # prod = {species: float(coeff) for species, coeff in prod_raw.items()}
         rad, prod = cast(tuple[dict[str, float], dict[str, float]], balance_stoichiometry({mfrm}, rfrms))
         stoich_dict = rad | prod
         factor = stoich_dict[mfrm]
@@ -154,7 +151,7 @@ class Dissociation:
         return log_eq_constant
 
 
-    def equilibrium_residual(self, log_guess: NDArray[np.float64], species_indices: dict[str, int], pressure: float = 1e5) -> float:
+    def equilibrium_residual(self, log_guess: NDArray[np.float64], species_indices: dict[str, int], pressure: float = 1.) -> float:
 
         self._validate_guess(log_guess, species_indices)
         temp = log_guess[species_indices["T"]]
