@@ -5,21 +5,18 @@
 # Dissociation Reaction Class File
 # ###################
 
-from chempy import balance_stoichiometry # type: ignore
-from domain.compounds import compounds, compounds_by_formula
+from domain.compounds import compounds
 from math import isclose, log10
 from numpy.typing import NDArray
-from typing import cast
 import numpy as np
 
 
 class Dissociation:
 
-    def __init__(self, m_id: str, r_ids: set[str]):
+    def __init__(self, m_id: str):
 
         self._set_molecule(m_id)
-        self._set_radicals(r_ids)
-        self._set_stoichioemetry()
+        self._set_comp()
         self._set_nonsolids()
 
 
@@ -44,35 +41,21 @@ class Dissociation:
 
 
     @property
-    def radicals_ids(self) -> set[str]:
+    def composition(self) -> dict[str, float]:
 
-        """
-        :return: A set of IDs for the radicals produced in this dissociation reaction.
-        """
+        return self._comp
+    
 
-        return self._radicals
+    def _set_comp(self):
 
-
-    def _set_radicals(self, ids: set[str]):
-
-        self._radicals: set[str] = ids
-
-
-    def _set_stoichioemetry(self):
-
-        rfrms = {compounds[r].formula for r in self._radicals}
-        mfrm = compounds[self._molecule].formula
-        rad, prod = cast(tuple[dict[str, float], dict[str, float]], balance_stoichiometry({mfrm}, rfrms))
-        stoich_dict = rad | prod
-        factor = stoich_dict[mfrm]
-        self._stoich: dict[str, float] = {k: v/factor for k, v in stoich_dict.items()}
+        self._comp = compounds[self._molecule].composition
 
 
     def _set_nonsolids(self):
 
-        self._nonsolids: set[str] = set()
-        for species in self._stoich.keys():
-            compound = compounds_by_formula[species]
+        self._nonsolids: set[str] = {self._molecule}
+        for species in self._comp.keys():
+            compound = compounds[species]
             if compound.state != "s":
                 self._nonsolids.add(compound.id)
 
@@ -82,20 +65,20 @@ class Dissociation:
     ########################################
 
 
-    def _validate_guess(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]):
+    def _validate_guess(self, log_guess: NDArray[np.float64], item_indices: dict[str, int]):
 
-        if len(log_guess) != len(species_indices):
+        if len(log_guess) != len(item_indices):
             raise ValueError(
-                f"Guess list length does not match number of species plus 1.\n"
+                f"Guess list length does not match number of items.\n"
                 f"Guess: {log_guess}\n"
-                f"Species Indices: {species_indices}"
+                f"Item Indices: {item_indices}"
             )
-        elif not all(species in species_indices for species in ({self._molecule} | self._radicals)):
+        elif not all(species in item_indices for species in ({self._molecule} | self._comp.keys())):
             raise ValueError(
                 f"Guess list does not contain all species in the reaction.\n"
                 f"Guess: {log_guess}\n"
-                f"Species Indices: {species_indices}\n"
-                f"Reaction Species: {self._stoich.keys()}"
+                f"Item Indices: {item_indices}\n"
+                f"Reaction Species: {set(self._molecule) | self._comp.keys()}"
             )
 
 
@@ -105,38 +88,39 @@ class Dissociation:
         Calculates and returns the pressure exponent for the equilibrium residual calculation based on the stoichiometry of the reaction.
         """
 
-        stoich_dict = self._stoich
-        mfrm = compounds[self._molecule].formula
-        rfrms = {compounds[r].formula for r in (self._radicals & self._nonsolids)}
-        return stoich_dict[mfrm] - sum(stoich_dict[r] for r in rfrms)
+        # stoich_dict = self._stoich
+        # mfrm = compounds[self._molecule].formula
+        # rfrms = {compounds[r].formula for r in (self._radicals & self._nonsolids)}
+        # return stoich_dict[mfrm] - sum(stoich_dict[r] for r in rfrms)
+        exp = 1.
+        for radical in (self._comp.keys() & self._nonsolids): # Carbon activity excluded
+            exp -= self._comp[radical]
+        return exp
     
 
-    def _calc_gas_moles(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]) -> float:
+    # def _calc_gas_moles(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]) -> float:
 
-        total_moles = 0.0
-        for species, indx in species_indices.items():
-            if (species != "T") and (compounds[species].state != "s"):
-                total_moles += 10**log_guess[indx]
-        return total_moles
+    #     total_moles = 0.0
+    #     for species, indx in species_indices.items():
+    #         if (species != "T") and (compounds[species].state != "s"):
+    #             total_moles += 10**log_guess[indx]
+    #     return total_moles
         
 
     def _calc_log_conc_product(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]) -> float:
 
-        product = log_guess[species_indices[self._molecule]] * self._stoich[compounds[self._molecule].formula]
-        for species, coeff in self._stoich.items():
-            species = compounds_by_formula[species].id
-            if (species in self._nonsolids) and (species != self._molecule):
-                product -= log_guess[species_indices[species]] * coeff
+        product = log_guess[species_indices[self._molecule]]
+        for species, coeff in self._comp.items(): # Carbon activity included
+            product -= log_guess[species_indices[species]] * coeff
         return product
     
 
-    def _calc_log_pres_factor(self, log_guess: NDArray[np.float64], species_indices: dict[str, int], pressure: float) -> float:
+    def _calc_log_pres_factor(self, pressure_fraction: float) -> float:
 
         exponent = self._calc_pressure_exp()
         if isclose(exponent, 0.0):
             return 0.0
-        fraction = pressure / self._calc_gas_moles(log_guess, species_indices)
-        return exponent * log10(fraction)
+        return exponent * log10(pressure_fraction)
 
 
     ########################################
@@ -151,11 +135,11 @@ class Dissociation:
         return log_eq_constant
 
 
-    def equilibrium_residual(self, log_guess: NDArray[np.float64], species_indices: dict[str, int], pressure: float = 1.) -> float:
+    def equilibrium_residual(self, log_guess: NDArray[np.float64], species_indices: dict[str, int], pressure_fraction: float) -> float:
 
         self._validate_guess(log_guess, species_indices)
         temp = log_guess[species_indices["T"]]
         log_conc_product = self._calc_log_conc_product(log_guess, species_indices)
-        log_pressure_factor = self._calc_log_pres_factor(log_guess, species_indices, pressure)
+        log_pressure_factor = self._calc_log_pres_factor(pressure_fraction)
         log_ecc = self.get_log_eq_constant(temp)
         return log_conc_product + log_pressure_factor - log_ecc

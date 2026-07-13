@@ -5,12 +5,11 @@
 # Compound Class File
 # ###################
 
-import numpy as np
-from chempy.util.parsing import formula_to_composition # type: ignore
+from chemparse import parse_formula
 from numpy.typing import NDArray
 from domain.compound_data import CompoundData
 from scipy.interpolate import BSpline, make_interp_spline
-from typing import cast
+import numpy as np
 
 
 class Compound:
@@ -27,13 +26,13 @@ class Compound:
         ):
 
         """
-        :param str name: The common name of the compound.
-        :param str formula: The chemical formula of the compound.
-        :param str id: A unique identifier for the compound.
-        :param CompoundData data: A CompoundData object containing the thermodynamic data for the compound.
-        :param set[str] dissociates: A set of compound IDs that this compound can dissociate into. Default is an empty set.
-        :param dict[str, float] composition: A dictionary mapping the IDs of the elements in the compound to their stoichiometric coefficients for one mole of the compound. Default is an empty dictionary.
-        :param str state: The reference state of the compound, either "g" for gas or "s" for solid. Default is "g".
+        :param name: The common name of the compound.
+        :param formula: The chemical formula of the compound.
+        :param id: A unique identifier for the compound.
+        :param data: A CompoundData object containing the thermodynamic data for the compound.
+        :param dissociates: A set of compound IDs that this compound can dissociate into. Default is an empty set.
+        :param composition: A dictionary mapping the IDs of the elements in the compound to their stoichiometric coefficients for one mole of the compound. Default is an empty dictionary.
+        :param state: The reference state of the compound, either "g" for gas or "s" for solid. Default is "g".
         """
 
         self.name: str = name
@@ -44,43 +43,45 @@ class Compound:
         self._data: CompoundData = data
         self.composition = composition
 
-        self._Cp_function: BSpline[np.float64] = make_interp_spline(
+        self._Cp_function: BSpline = make_interp_spline(
             self._data.temperatures,
             self._data.Cp_list,
             k=1,
         )
 
-        self._S_function: BSpline[np.float64] = make_interp_spline(
+        self._S_function: BSpline = make_interp_spline(
             self._data.temperatures,
             self._data.S_list,
             k=1,
         )
 
-        self._DS_function: BSpline[np.float64] = self._make_finite_function(self._data.DS_list)
+        self._DS_function: BSpline = self._make_finite_function(self._data.DS_list)
 
-        self._SH_function: BSpline[np.float64] = make_interp_spline(
+        self._SH_function: BSpline = make_interp_spline(
             self._data.temperatures,
             self._data.SH_list,
             k=1,
         )
 
-        self._Hf_function: BSpline[np.float64] = make_interp_spline(
+        self._Hf_function: BSpline = make_interp_spline(
             self._data.temperatures,
             self._data.Hf_list,
             k=1,
         )
 
-        self._Gf_function: BSpline[np.float64] = make_interp_spline(
+        self._Gf_function: BSpline = make_interp_spline(
             self._data.temperatures,
             self._data.Gf_list,
             k=1,
         )
 
-        self._logKf_function: BSpline[np.float64] = self._make_finite_function(self._data.logKf_list)
+        self._logKf_function: BSpline = self._make_finite_function(self._data.logKf_list)
 
         self._set_std_temp()
 
         self.stdHf: float = float(self._Hf_function(self.std_temp))
+
+        self._set_atomic_comp()
 
 
     def _set_std_temp(self):
@@ -99,6 +100,21 @@ class Compound:
         if temp == -1.0:
             raise ValueError("No standard reference temperature found in data.")
         self.std_temp = temp
+
+    
+    def _set_atomic_comp(self):
+
+        atomic_numbers: dict[str, int] = {
+            "H": 1,
+            "C": 6,
+            "N": 7,
+            "O": 8,
+            "Ar": 18
+        }
+        composition: dict[int, float] = {}
+        for atom, count in parse_formula(self.formula).items():
+            composition[atomic_numbers[atom]] = count
+        self._atomic_comp = composition
 
 
     def Cp(self, temperature: float) -> float:
@@ -205,7 +221,8 @@ class Compound:
             case _:
                 raise ValueError(f"Data label '{label}' not recognized.")
 
-    def _make_finite_function(self, list: NDArray[np.float64]) -> BSpline[np.float64]:
+
+    def _make_finite_function(self, list: NDArray[np.float64]) -> BSpline:
 
         """
         Separate function maker method as DS and logKf tables include np.inf values.
@@ -217,6 +234,7 @@ class Compound:
             finite_list,
             k=1,
         )
+
 
     def _get_finite_list(self, list: NDArray[np.float64]) -> NDArray[np.float64]:
 
@@ -230,12 +248,12 @@ class Compound:
         finite_list[~finite_mask] = max_finite * 1e6
         return finite_list
 
-
+    
+    @property
     def atomic_composition(self) -> dict[int, float]:
 
         """
-        Returns the atomic composition of the compound as a dictionary mapping atomic numbers to their respective counts. Sanitizes the chempy output from SymPy numerics.
+        Returns the atomic composition of the compound as a dictionary mapping atomic numbers to their respective counts.
         """
 
-        composition = cast(dict[int, float], formula_to_composition(self.formula))
-        return composition
+        return self._atomic_comp
