@@ -99,11 +99,12 @@ compounds["Hydrogen_Monatomic"] = Compound(
     composition = {"Hydrogen": 0.5}
 )
 
-compounds["Nitrogen_Oxide"] = Compound(
+compounds["Nitric_Oxide"] = Compound(
     name = "Nitrogen Oxide",
     formula = "NO",
-    id = "Nitrogen_Oxide",
-    data = load_compound_data("Nitrogen_Oxide"),
+    id = "Nitric_Oxide",
+    data = load_compound_data("Nitric_Oxide"),
+    dissociates = {"Nitrogen", "Nitrogen_Monatomic", "Oxygen", "Oxygen_Monatomic"},
     composition = {"Nitrogen": 0.5, "Oxygen": 0.5}
 )
 
@@ -123,6 +124,23 @@ compounds["Carbon_Monoxide"] = Compound(
     data = load_compound_data("Carbon_Monoxide"),
     dissociates = {"Carbon", "Oxygen_Monatomic"},
     composition = {"Carbon": 1, "Oxygen": 0.5}
+)
+
+compounds["Nitrogen_Dioxide"] = Compound(
+    name = "Nitrogen Dioxide",
+    formula = "NO2",
+    id = "Nitrogen_Dioxide",
+    data = load_compound_data("Nitrogen_Dioxide"),
+    dissociates = {"Nitrogen_Monatomic", "Nitrogen", "Nitric_Oxide", "Oxygen", "Oxygen_Monatomic"},
+    composition = {"Nitrogen": 0.5, "Oxygen": 1.}
+)
+
+compounds["Nitrogen_Monatomic"] = Compound(
+    name = "Monatomic Nitrogen",
+    formula = "N",
+    id = "Nitrogen_Monatomic",
+    data = load_compound_data("Nitrogen_Monatomic"),
+    composition = {"Nitrogen": 0.5}
 )
 
 compounds_by_formula: dict[str, Compound] = {c.formula: c for c in compounds.values()}

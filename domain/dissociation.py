@@ -88,23 +88,10 @@ class Dissociation:
         Calculates and returns the pressure exponent for the equilibrium residual calculation based on the stoichiometry of the reaction.
         """
 
-        # stoich_dict = self._stoich
-        # mfrm = compounds[self._molecule].formula
-        # rfrms = {compounds[r].formula for r in (self._radicals & self._nonsolids)}
-        # return stoich_dict[mfrm] - sum(stoich_dict[r] for r in rfrms)
         exp = 1.
         for radical in (self._comp.keys() & self._nonsolids): # Carbon activity excluded
             exp -= self._comp[radical]
         return exp
-    
-
-    # def _calc_gas_moles(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]) -> float:
-
-    #     total_moles = 0.0
-    #     for species, indx in species_indices.items():
-    #         if (species != "T") and (compounds[species].state != "s"):
-    #             total_moles += 10**log_guess[indx]
-    #     return total_moles
         
 
     def _calc_log_conc_product(self, log_guess: NDArray[np.float64], species_indices: dict[str, int]) -> float:
