@@ -26,32 +26,72 @@ i: dict[str, int] = {
     "Hydrogen": 3,
     "Hydrogen_Monatomic": 4,
     "Hydroxyl": 5,
-    "Methane": 6,
-    "Oxygen": 7,
-    "Oxygen_Monatomic": 8,
-    "Water": 9,
-    "T": 10
+    "Nitric_Oxide": 6,
+    "Nitrogen": 7,
+    "Nitrogen_Dioxide": 8,
+    "Nitrogen_Monatomic": 9,
+    "Methane": 10,
+    "Oxygen": 11,
+    "Oxygen_Monatomic": 12,
+    "Water": 13,
+    "T": 14
 }
 
 r: dict[str, int] = {
     "H_mass_balance": 0,
     "C_mass_balance": 1,
-    "O_mass_balance": 2,
-    "Carbon_Dioxide": 3,
-    "Carbon_Monoxide": 4,
-    "Hydrogen_Monatomic": 5,
-    "Hydroxyl": 6,
-    "Methane": 7,
-    "Oxygen_Monatomic": 8,
-    "Water": 9,
-    "Energy_balance": 10
+    "N_mass_balance": 2,
+    "O_mass_balance": 3,
+    "Carbon_Dioxide": 4,
+    "Carbon_Monoxide": 5,
+    "Hydrogen_Monatomic": 6,
+    "Hydroxyl": 7,
+    "Nitric_Oxide": 8,
+    "Nitrogen_Dioxide": 9,
+    "Nitrogen_Monatomic": 10,
+    "Methane": 11,
+    "Oxygen_Monatomic": 12,
+    "Water": 13,
+    "Energy_balance": 14
 }
 
-init_log_guess: NDArray[np.float64] = np.array([-50, -0.47756, -50, -50, -50, -50, -50, -3, -50, -0.17653, 3000])
+# i: dict[str, int] = {
+#     "Carbon": 0,
+#     "Carbon_Dioxide": 1,
+#     "Carbon_Monoxide": 2,
+#     "Hydrogen": 3,
+#     "Hydrogen_Monatomic": 4,
+#     "Hydroxyl": 5,
+#     "Methane": 6,
+#     "Oxygen": 7,
+#     "Oxygen_Monatomic": 8,
+#     "Water": 9,
+#     "T": 10
+# }
 
-init_atoms: dict[int, float] = {1: 1.332, 6: 0.333, 8: 1.334}
+# r: dict[str, int] = {
+#     "H_mass_balance": 0,
+#     "C_mass_balance": 1,
+#     "O_mass_balance": 2,
+#     "Carbon_Dioxide": 3,
+#     "Carbon_Monoxide": 4,
+#     "Hydrogen_Monatomic": 5,
+#     "Hydroxyl": 6,
+#     "Methane": 7,
+#     "Oxygen_Monatomic": 8,
+#     "Water": 9,
+#     "Energy_balance": 10
+# }
 
-initial_enthalpy: float = -24.932709
+init_log_guess: NDArray[np.float64] = np.array([-50., -1.07188, -50., -50., -50., -50., -50., -0.16879, -50., -50., -1.16879, -50., -50., -0.77085, 2000])
+
+init_atoms: dict[int, float] = {1: 0.61017, 6: 0.15254, 7: 1.35593, 8: 0.33898}
+
+# init_log_guess: NDArray[np.float64] = np.array([-50., -0.57978, -50., -50., -50., -50., -0.67669, -50., -50., -0.27875, 3000.])
+
+# init_atoms: dict[int, float] = {1: 1.89474, 6: 0.47368, 8: 1.05263}
+
+initial_enthalpy: float = -11.42131
 
 
 def mass_balance_residuals(log_guess: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -63,6 +103,9 @@ def mass_balance_residuals(log_guess: NDArray[np.float64]) -> NDArray[np.float64
 
     guess_C = 10**log_guess[i["Carbon_Dioxide"]] + 10**log_guess[i["Carbon_Monoxide"]] + 10**log_guess[i["Methane"]]
     mbr[r["C_mass_balance"]] = init_atoms[6] - guess_C
+
+    guess_N = 10**log_guess[i["Nitric_Oxide"]] + 2*(10**log_guess[i["Nitrogen"]]) + 10**log_guess[i["Nitrogen_Dioxide"]] + 10**log_guess[i["Nitrogen_Monatomic"]]
+    mbr[r["N_mass_balance"]] = init_atoms[7] - guess_N
 
     guess_O = 2*(10**log_guess[i["Carbon_Dioxide"]]) + 10**log_guess[i["Carbon_Monoxide"]] + 10**log_guess[i["Hydroxyl"]] + 2*(10**log_guess[i["Oxygen"]]) + 10**log_guess[i["Oxygen_Monatomic"]] + 10**log_guess[i["Water"]]
     mbr[r["O_mass_balance"]] = init_atoms[8] - guess_O
@@ -124,4 +167,7 @@ def equilibrate(init_log_guess: NDArray[np.float64], pressure: float):
     return result
 
 
-print(equilibrate(init_log_guess, 1.))
+results = equilibrate(init_log_guess, 1.)
+print(f"residuals = {results.fun}")
+print(f"cost = {results.cost}")
+print(f"x = {results.x}")

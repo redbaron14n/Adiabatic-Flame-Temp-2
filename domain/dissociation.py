@@ -107,7 +107,10 @@ class Dissociation:
         exponent = self._calc_pressure_exp()
         if isclose(exponent, 0.0):
             return 0.0
-        return exponent * log10(pressure_fraction)
+        try:
+            return exponent * log10(pressure_fraction)
+        except ValueError:
+            return exponent * (-50.)
 
 
     ########################################
